@@ -86,6 +86,8 @@ def generate_dataset():
                 try:
                     pattern = calculator.get_pattern(structure) #returns peak positions and intensities
                     filepath = f"data/crystals/{crystal}/{crystal}_{i:03d}.png"
+                    folder = f"data/crystals/{crystal}"
+                    os.makedirs(folder, exist_ok=True)
                     save_pattern_as_image(pattern, filepath)
                 except Exception as e:
                     print(f"  skipping structure {i}: {e}")
