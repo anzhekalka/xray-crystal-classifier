@@ -21,14 +21,13 @@ for param in resnet18.parameters():
 for param in resnet18.layer4.parameters():
     param.requires_grad = True
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
-resnet18 = resnet18.to(device)
-print(f"Using device: {device}")
-
 num_targer_classes = 7 
 in_features = resnet18.fc.in_features
 resnet18.fc = nn.Linear(in_features, num_targer_classes) #replacing the final layer 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
+resnet18 = resnet18.to(device)
+print(f"Using device: {device}")
 criterion = nn.CrossEntropyLoss() #calculaets how wrong the logit score is 
 optimizer = optim.Adam(
     filter(lambda p: p.requires_grad, resnet18.parameters()),
