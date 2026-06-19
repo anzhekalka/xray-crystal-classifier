@@ -13,6 +13,10 @@ import os
 #perapring the model 
 resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT) #loading the model with pretrained layers
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
+resnet18 = resnet18.to(device)
+print(f"Using device: {device}")
+
 for param in resnet18.parameters(): 
     param.requires_grad = False #freezing all layers
 
@@ -40,6 +44,7 @@ for epoche in range (num_epoches): #loop for the epochs
     running_loss = 0.0 #loss accumulator 
 
     for images, labels in loader_train: #loop for each batch in a data loader 
+        images, labels = images.to(device), labels.to(device) #gpu 
         optimizer.zero_grad() 
 
         outputs = resnet18(images)
@@ -60,6 +65,7 @@ total_correct =0
 total_images = 0
 with torch.no_grad(): 
     for images, labels in loader_test: 
+        images, labels = images.to(device), labels.to(device) #gpu
         outputs = resnet18(images)
         loss = criterion(outputs, labels)
 
