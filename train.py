@@ -13,9 +13,6 @@ import os
 #perapring the model 
 resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT) #loading the model with pretrained layers
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
-resnet18 = resnet18.to(device)
-print(f"Using device: {device}")
 
 for param in resnet18.parameters(): 
     param.requires_grad = False #freezing all layers
@@ -24,6 +21,9 @@ for param in resnet18.parameters():
 for param in resnet18.layer4.parameters():
     param.requires_grad = True
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
+resnet18 = resnet18.to(device)
+print(f"Using device: {device}")
 
 num_targer_classes = 7 
 in_features = resnet18.fc.in_features
