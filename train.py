@@ -17,8 +17,6 @@ resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT) #loading the
 for param in resnet18.parameters(): 
     param.requires_grad = False #freezing all layers
 
-for param in resnet18.layer4.parameters(): 
-    param.requires_grad = False #freezing 4th layer
 
 num_target_classes = 7 
 in_features = resnet18.fc.in_features
