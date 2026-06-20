@@ -22,27 +22,22 @@ evaluate_transform = transforms.Compose([
 
 train_transform = transforms.Compose([
     transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(5),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ]) #transform pipeline for the training dataset
 
-train_dataset = ImageFolder("data/crystals/", transform=train_transform) 
-test_dataset = ImageFolder("data/crystals/", transform=evaluate_transform)#two full data sets with different tranforms
+full_dataset = ImageFolder("data/crystals/", transform=train_transform) # full data sets with an applied tranforms
 
 generator = Generator().manual_seed(42) #ensure the random split is exactly the same after each run
-train_indices, test_indices = random_split(
-    range(len(train_dataset)), [0.8, 0.2], generator=generator
- ) #splitting dataset into train and test data 
-
-from torch.utils.data import Subset
-train_set = Subset(train_dataset, train_indices.indices)
-test_set  = Subset(test_dataset, test_indices.indices)
+train_set, test_set = random_split(full_dataset, [0.8, 0.2], generator=generator) #splitting dataset into train and test data 
 
 loader_train = DataLoader(train_set, batch_size=32, shuffle=True) #seperate data in batches
 loader_test = DataLoader(test_set, batch_size=32, shuffle=False)
 
-dataset = train_dataset
+class_names = full_dataset.classes
+print(f"Class names: {class_names}")
+print(f"Number of training images: {len(train_set)}")
+print(f"Number of test images: {len(test_set)}")
+
+dataset = full_dataset

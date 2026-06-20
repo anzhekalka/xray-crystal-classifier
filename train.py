@@ -38,7 +38,7 @@ optimizer = optim.Adam(
 
 
 #training loop 
-num_epoches = 50
+num_epoches = 12
 
 for epoche in range (num_epoches): #loop for the epochs
     resnet18.train()
