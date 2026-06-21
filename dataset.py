@@ -11,20 +11,12 @@ from torchvision import transforms
 from torch.utils.data import random_split
 from torch import Generator
 
-evaluate_transform = transforms.Compose([
-    transforms.Resize((224, 224)), 
-    transforms.ToTensor(), #convert PIL Image to PyTorch Tensor
-    transforms.Normalize(
-        mean = [0.485, 0.456, 0.406],
-        std  = [0.229, 0.224, 0.225] #official ResNet training values 
-    )
-]) #transform pipeline for the evaluation dataset
 
 train_transform = transforms.Compose([
     transforms.Resize((224, 224)),
+    transforms.Grayscale(num_output_channels=1),  # ensure single channel
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.449], std=[0.226])  # grayscale ImageNet stats (averaged)
 ]) #transform pipeline for the training dataset
 
 full_dataset = ImageFolder("data/crystals/", transform=train_transform) # full data sets with an applied tranforms

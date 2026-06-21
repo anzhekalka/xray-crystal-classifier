@@ -27,8 +27,8 @@ load_dotenv()
 api_key = os.getenv("MATERIALS_PROJECT_API_KEY")
 
 #defining 
-
-C_SYSTEMS = ["tetragonal",
+"""C_SYSTEMS = ["cubic"]"""
+C_SYSTEMS = [ "tetragonal",
 "orthorhombic",
 "hexagonal",
 "trigonal",
@@ -37,29 +37,37 @@ C_SYSTEMS = ["tetragonal",
 
 def save_pattern_as_image(pattern, filepath):
     """
-    takes raw diffraction data (lists of numbers) and converts it into a PNG image file
+    converts XRD pattern into a 2D reciprocal space pixel strip.
+    Intensity values are mapped directly to pixel brightness (0-255)
+    along a 1D strip, then duplicated vertically to fill 224x224.
+    This preserves exact peak position through CNN downsampling,
+    unlike a sparse line plot where peaks can be lost in pooling.
     """
-    fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=56)
+    x_peaks = np.array(pattern.x)
+    y_peaks = np.array(pattern.y)
 
-    x = pattern.x
-    y = pattern.y
+    # build a continuous intensity profile across the full angle range
+    width = 224
+    angle_range = np.linspace(0, 90, width)
+    intensity = np.zeros(width)
 
-    y_max = max(y) if max(y) > 0 else 1 #normalizing intensities so tallest peak = 1.0
-    y_norm = [val/y_max for val in y]
+    sigma = 0.3  # peak width in degrees
+    for peak_angle, peak_intensity in zip(x_peaks, y_peaks):
+        intensity += peak_intensity * np.exp(
+            -0.5 * ((angle_range - peak_angle) / sigma) ** 2
+        )
 
-    for xi, yi in zip(x, y_norm):
-        color = plt.cm.hot(yi)  # hot colormap: black→red→yellow→white
-        ax.plot([xi, xi], [0, yi], color=color, linewidth=1.5)
-    
-    ax.set_facecolor('black')
-    fig.patch.set_facecolor('black')
-    ax.set_xlim(0, 90)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
-    
-    plt.savefig(filepath, bbox_inches='tight',
-                pad_inches=0, facecolor='black', dpi=56)
-    plt.close(fig)
+    # normalize to 0-255 pixel brightness range
+    if intensity.max() > 0:
+        intensity = intensity / intensity.max()
+    pixel_strip = (intensity * 255).astype(np.uint8)
+
+    # duplicate the 1D strip vertically to create a 224x224 image
+    image_array = np.tile(pixel_strip, (224, 1))  # shape: (224, 224)
+
+    # save as a single-channel grayscale PNG
+    img = Image.fromarray(image_array, mode='L')
+    img.save(filepath)
 
 
 def generate_dataset():

@@ -11,20 +11,34 @@ import joblib
 import os
 
 #perapring the model 
-resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT) #loading the model with pretrained layers
 
+resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
-for param in resnet18.parameters(): 
-    param.requires_grad = False #freezing all layers
+# replace first conv layer to accept 1 channel instead of 3
+# average the original 3-channel weights into a single channel
+# so we keep some pretrained signal instead of random init
+original_weights = resnet18.conv1.weight.data  # shape: [64, 3, 7, 7]
+new_conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+new_conv1.weight.data = original_weights.mean(dim=1, keepdim=True)  # average RGB -> 1 channel
+resnet18.conv1 = new_conv1
 
+for param in resnet18.parameters():
+    param.requires_grad = False
 
-num_target_classes = 7 
+for param in resnet18.layer4.parameters():
+    param.requires_grad = True
+
+for param in resnet18.conv1.parameters():
+    param.requires_grad = True  # unfreeze new first layer — it needs to learn from scratch-ish
+
+num_targer_classes = 7
 in_features = resnet18.fc.in_features
+resnet18.fc = nn.Linear(in_features, num_targer_classes)
 
-resnet18.fc = nn.Sequential(
-    nn.Dropout(0.5),
-    nn.Linear(in_features, num_target_classes)
-) #replacing the final layer 
+
+
+
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
 resnet18 = resnet18.to(device)
