@@ -88,4 +88,19 @@ joblib.dump(dataset.classes, "model/classes.pkl")
 
 print("Model saved!")
 
+# Diagnostic check — see what the model actually predicts
+from collections import Counter
+
+resnet18.eval()
+all_preds = []
+with torch.no_grad():
+    for images, labels in loader_test:
+        images = images.to(device)
+        outputs = resnet18(images)
+        preds = torch.argmax(outputs, dim=1)
+        all_preds.extend(preds.cpu().numpy())
+
+print("Prediction distribution:", Counter(all_preds))
+print("Class mapping:", {i: name for i, name in enumerate(dataset.classes)})
+
 
