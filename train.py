@@ -14,9 +14,7 @@ import os
 
 resnet18 = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
-# replace first conv layer to accept 1 channel instead of 3
-# average the original 3-channel weights into a single channel
-# so we keep some pretrained signal instead of random init
+
 original_weights = resnet18.conv1.weight.data  # shape: [64, 3, 7, 7]
 new_conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
 new_conv1.weight.data = original_weights.mean(dim=1, keepdim=True)  # average RGB -> 1 channel
@@ -33,26 +31,24 @@ for param in resnet18.conv1.parameters():
 
 num_targer_classes = 7
 in_features = resnet18.fc.in_features
-resnet18.fc = nn.Linear(in_features, num_targer_classes)
-
-
-
-
-
+resnet18.fc = nn.Sequential(
+    nn.Dropout(0.5),
+    nn.Linear(in_features, num_targer_classes)
+)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #gpu support for training
 resnet18 = resnet18.to(device)
 print(f"Using device: {device}")
-criterion = nn.CrossEntropyLoss() #calculaets how wrong the logit score is 
+
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)#calculaets how wrong the logit score is 
 optimizer = optim.Adam(
     filter(lambda p: p.requires_grad, resnet18.parameters()),
-    lr=0.0001, 
-    weight_decay=1e-4 #penalize overly complex solutions
+    lr=0.0001,
+    weight_decay=1e-3  # increased from default
 )
 
-
 #training loop 
-num_epoches = 12
+num_epoches = 10
 
 for epoche in range (num_epoches): #loop for the epochs
     resnet18.train()

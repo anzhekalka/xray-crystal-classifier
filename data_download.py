@@ -20,6 +20,9 @@ from mp_api.client import MPRester #the client that talks to Materials Project d
 import os
 from dotenv import load_dotenv #api 
 
+import random
+from pymatgen.core import Structure
+
 
 
 #api loading
@@ -27,8 +30,7 @@ load_dotenv()
 api_key = os.getenv("MATERIALS_PROJECT_API_KEY")
 
 #defining 
-"""C_SYSTEMS = ["cubic"]"""
-C_SYSTEMS = [ "tetragonal",
+C_SYSTEMS = ["cubic", "tetragonal",
 "orthorhombic",
 "hexagonal",
 "trigonal",
@@ -46,28 +48,42 @@ def save_pattern_as_image(pattern, filepath):
     x_peaks = np.array(pattern.x)
     y_peaks = np.array(pattern.y)
 
-    # build a continuous intensity profile across the full angle range
+    #randomly scale individual peak intensities
+    intensity_jitter = np.random.uniform(0.5, 1.5, size=len(y_peaks))
+    y_peaks = y_peaks * intensity_jitter
+
+    #build a continuous intensity profile across the full angle range
     width = 224
     angle_range = np.linspace(0, 90, width)
     intensity = np.zeros(width)
 
-    sigma = 0.3  # peak width in degrees
+    sigma = 0.3  #peak width in degrees
     for peak_angle, peak_intensity in zip(x_peaks, y_peaks):
         intensity += peak_intensity * np.exp(
             -0.5 * ((angle_range - peak_angle) / sigma) ** 2
         )
 
-    # normalize to 0-255 pixel brightness range
+    #normalize to 0-255 pixel brightness range
     if intensity.max() > 0:
         intensity = intensity / intensity.max()
     pixel_strip = (intensity * 255).astype(np.uint8)
+    #duplicate the 1D strip vertically to create a 224x224 image
+    image_array = np.tile(pixel_strip, (224, 1))
 
-    # duplicate the 1D strip vertically to create a 224x224 image
-    image_array = np.tile(pixel_strip, (224, 1))  # shape: (224, 224)
-
-    # save as a single-channel grayscale PNG
+    #save as a single-channel grayscale PNG
     img = Image.fromarray(image_array, mode='L')
     img.save(filepath)
+
+
+def perturb_structure(structure):
+    """
+    randomly scales lattice parameters by ±1-3% to prevent
+    the model from memorizing exact peak pixel positions
+    """
+    scale_factor = random.uniform(0.97, 1.03)  # shrink or grow by up to 3%
+    new_lattice = structure.lattice.scale(structure.lattice.volume * (scale_factor ** 3))
+    perturbed = Structure(new_lattice, structure.species, structure.frac_coords)
+    return perturbed
 
 
 def generate_dataset():
@@ -81,6 +97,9 @@ def generate_dataset():
         for crystal in C_SYSTEMS:
             print(f"Downloading {crystal}...")
 
+            folder = f"data/crystals/{crystal}"
+            os.makedirs(folder, exist_ok=True)
+
             docs = mpr.materials.summary.search( #Downloads 100 crystal structures
                 crystal_system=crystal.capitalize(),
                 fields=["structure", "symmetry"],
@@ -91,14 +110,14 @@ def generate_dataset():
             print(f"  found {len(structures)} structures")
 
             for i, structure in enumerate(structures):
-                try:
-                    pattern = calculator.get_pattern(structure) #returns peak positions and intensities
-                    filepath = f"data/crystals/{crystal}/{crystal}_{i:03d}.png"
-                    folder = f"data/crystals/{crystal}"
-                    os.makedirs(folder, exist_ok=True)
-                    save_pattern_as_image(pattern, filepath)
-                except Exception as e:
-                    print(f"  skipping structure {i}: {e}")
+                for variant in range(3):  # 3 perturbed variants per structure
+                    try:
+                        perturbed = perturb_structure(structure)
+                        pattern = calculator.get_pattern(perturbed)
+                        filepath = f"data/crystals/{crystal}/{crystal}_{i:03d}_{variant}.png"
+                        save_pattern_as_image(pattern, filepath)
+                    except Exception as e:
+                        print(f"  skipping structure {i} variant {variant}: {e}")
 
             print(f"  saved {len(os.listdir(f'data/crystals/{crystal}'))} images")
 
