@@ -113,4 +113,17 @@ with torch.no_grad():
 print("Prediction distribution:", Counter(all_preds))
 print("Class mapping:", {i: name for i, name in enumerate(dataset.classes)})
 
+from sklearn.metrics import classification_report, confusion_matrix
 
+resnet18.eval()
+all_preds, all_labels = [], []
+with torch.no_grad():
+    for images, labels in loader_test:
+        images, labels = images.to(device), labels.to(device)
+        outputs = resnet18(images)
+        preds = torch.argmax(outputs, dim=1)
+        all_preds.extend(preds.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
+
+print(classification_report(all_labels, all_preds, target_names=dataset.classes))
+print(confusion_matrix(all_labels, all_preds))
