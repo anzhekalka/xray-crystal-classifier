@@ -1,0 +1,205 @@
+# X-Ray Diffraction Crystal Classifier
+
+I built this to classify X-ray diffraction patterns into crystal systems 
+using a fine-tuned ResNet-18, trained on synthetic data generated from real 
+Materials Project crystal structures. The project is meant to connect to 
+the kind of work done at the ESRF synchrotron in Grenoble, where I study.
+
+## Preview
+
+![Upload and prediction](screenshot2.png)
+![Probability chart and explanation](screenshot.png)
+
+
+## What it does
+
+- Generates synthetic XRD patterns from ~1,750 real crystal structures 
+  pulled from the Materials Project database, using pymatgen's XRD 
+  calculator
+- Classifies an uploaded diffraction pattern into one of 7 crystal systems 
+  (cubic, hexagonal, monoclinic, orthorhombic, tetragonal, trigonal, 
+  triclinic)
+- Shows the model's confidence and a probability breakdown across all 7 
+  classes
+- Calls Mistral AI to explain the prediction — what the crystal system 
+  means, real examples, and why the diffraction pattern looks the way it 
+  does
+
+
+## Technologies used
+
+| Category | Tools |
+| Deep Learning | PyTorch, torchvision (ResNet-18, transfer learning) |
+| Scientific Data | pymatgen, Materials Project API |
+| Visualization | plotly |
+| Web App | Streamlit |
+| AI Explanation | Mistral AI API |
+| Training | Google Colab (GPU) |
+| Environment | python-dotenv |
+
+
+## Data source
+
+I pulled real crystal structures from the [Materials 
+Project](https://materialsproject.org) database - 150,000+ computed 
+structures, free to query through their API. For each one, pymatgen's 
+`XRDCalculator` computes a theoretical diffraction pattern (Cu-Kα 
+radiation). I render each pattern as a "reciprocal space pixel strip" — 
+intensity mapped to pixel brightness across a 224-pixel strip, then tiled 
+vertically into a 224×224 grayscale image. Each structure gets perturbed 
+(±3% lattice scaling) and intensity-jittered 3 times, which gave me about 
+5,250 training images.
+
+
+## The Engineering Journey
+## How I got here (the debugging part)
+
+My first version plateaued at ~32% accuracy — barely better than guessing 
+randomly across 7 classes. I tried more epochs, unfreezing more layers, 
+adding data augmentation — nothing moved the needle. That was the signal 
+that something was wrong with the data representation itself, not the 
+training setup.
+
+Turned out the problem was how I was drawing the patterns. Thin lines on 
+a mostly-black image lose information when they pass through ResNet's 
+pooling layers — small peaks were getting averaged away before the model 
+ever saw them. I switched to encoding intensity as pixel brightness in a 
+strip that spans the full image height, so peaks survive downsampling no 
+matter what. I also swapped ResNet's first layer to take 1-channel 
+grayscale input directly instead of faking RGB by tripling the same 
+channel three times.
+
+That fixed the underfitting — loss actually started dropping. But then I 
+hit the opposite problem: training loss collapsed to near zero while test 
+accuracy stayed flat. The model was just memorizing the exact pixel 
+positions of my synthetic peaks, since pymatgen always outputs the same 
+theoretical pattern for a given structure. I fixed this by randomly 
+perturbing the crystal lattice by a few percent and jittering peak 
+intensities before generating each image, plus dropout, label smoothing, 
+and stronger weight decay on the model side.
+
+## Where it landed
+
+60% accuracy on the test set. Looking at the confusion matrix, the model 
+is genuinely good at cubic (81% F1) and triclinic (68% F1) — the two 
+extremes of crystal symmetry, which makes sense since they produce the 
+most distinctive patterns. It struggles more with systems that are 
+geometrically close to each other, like orthorhombic vs. monoclinic 
+(39 misclassifications, the largest single confusion in the matrix) and 
+hexagonal vs. trigonal. That's not just a model weakness — real 
+crystallographers run into the same ambiguity and need more than peak 
+position alone to tell these apart.
+
+Class mapping: {0: 'cubic', 1: 'hexagonal', 2: 'monoclinic', 3: 'orthorhombic', 4: 'tetragonal', 5: 'triclinic', 6: 'trigonal'}
+              precision    recall  f1-score   support
+
+       cubic       0.85      0.77      0.81       156
+   hexagonal       0.66      0.63      0.65       153
+  monoclinic       0.46      0.55      0.50       129
+orthorhombic       0.49      0.45      0.47       166
+  tetragonal       0.60      0.55      0.58       148
+   triclinic       0.64      0.74      0.68       148
+    trigonal       0.54      0.53      0.54       150
+
+    accuracy                           0.60      1050
+   macro avg       0.60      0.60      0.60      1050
+weighted avg       0.61      0.60      0.60      1050
+
+[[120   7   0   7   7   3  12]
+ [  5  97   5  11  14   5  16]
+ [  0   0  71  19   3  28   8]
+ [  2  13  39  74  12  12  14]
+ [  7  13  10  14  82   7  15]
+ [  2   2  19   9   3 109   4]
+ [  5  15   9  18  16   7  80]]
+
+
+## Future work
+The most promising next step is probably a 1D CNN trained directly on the 
+intensity arrays instead of rendering them as images first — that's 
+closer to how the underlying physics actually works, and would skip the 
+whole image-encoding problem entirely.
+
+
+## How to run locally
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/anzhekalka/xray-crystal-classifier.git
+cd xray-crystal-classifier
+```
+
+**2. Create a virtual environment**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+**3. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+**4. Add your API keys**
+
+Create a `.env` file in the root folder:
+  MISTRAL_API_KEY=your_mistral_key_here
+  MATERIALS_PROJECT_API_KEY=your_materials_project_key_here
+
+Get a free Mistral key at [console.mistral.ai](https://console.mistral.ai)
+Get a free Materials Project key at [materialsproject.org](https://materialsproject.org)
+
+**5. Generate the dataset** *(optional — only needed to retrain)*
+```bash
+python data_download.py
+```
+
+**6. Train the model** *(optional — pretrained model included, GPU recommended)*
+```bash
+python train.py
+```
+
+**7. Run the app**
+```bash
+streamlit run app.py
+```
+Open your browser at `http://localhost:8501`
+
+
+## Project structure 
+```
+xray-crystal-classifier/
+
+├── data/                  ← synthetic XRD pattern images (not in repo)
+
+├── model/                 ← trained model weights + class labels
+
+├── data_download.py       ← downloads structures + generates patterns
+
+├── dataset.py              ← PyTorch dataset/dataloader pipeline
+
+├── train.py                ← trains and evaluates the CNN (run on GPU/Colab)
+
+├── explainer.py            ← Mistral AI scientific explanation
+
+├── app.py                  ← Streamlit web app
+
+├── requirements.txt
+
+└── .env                    ← API keys (never shared)
+```
+
+## What I learned
+
+- How transfer learning and fine-tuning work in practice (freezing/
+  unfreezing layers, modifying architecture for custom input channels)
+- How to systematically diagnose underfitting vs. overfitting from loss 
+  curves and confusion matrices
+- Why data augmentation can hurt scientific data when it distorts 
+  physically meaningful signal (e.g., rotation/flipping on diffraction 
+  patterns)
+- GPU training workflows (Google Colab, device management, syncing code 
+  via GitHub and data via Google Drive)
+- The physics of X-ray diffraction and crystal symmetry systems
+- Real engineering judgment: knowing when a result is "good enough" given 
+  the genuine difficulty of the problem

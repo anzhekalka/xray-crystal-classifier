@@ -1,0 +1,9 @@
+torch
+torchvision
+streamlit
+pillow
+plotly
+requests
+python-dotenv
+joblib
+scikit-learn

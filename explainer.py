@@ -14,20 +14,37 @@ def explain_prediction(crystal_system: str, confidence: float ) :
     returns a scientific explanation of the predicted crystal system,
     provided by Mistral AI. Returns None if the request was not successful.
     """
-    prompt = f"""You are a crystallographer explaining results to a student.
+    prompt = f"""You are a crystallographer explaining results to a curious 
+student who is learning about X-ray diffraction for the first time.
 
-    An AI model analyzed an X-ray diffraction pattern and classified it as 
-    {crystal_system.upper()} crystal system, with {confidence:.0%} confidence.
+An AI model analyzed an X-ray diffraction pattern and classified it as 
+{crystal_system.upper()} crystal system, with {confidence:.0%} confidence.
 
-    Give exactly 3 bullet points explaining:
-    1. What defines this crystal system geometrically (lattice angles and 
-    side lengths)
-    2. A real-world example material with this crystal system
-    3. What the diffraction pattern of this crystal system typically looks 
-    like and why (peak spacing, number of peaks, symmetry)
+Write a clear, engaging explanation covering:
 
-    Keep it scientifically accurate but accessible. No code names, no 
-    extra sections, exactly 3 bullet points."""
+1. **Geometric definition** — explain in 2-3 sentences what defines this 
+   crystal system (lattice angles and side lengths), and why this 
+   particular geometry exists in nature.
+
+2. **Real-world examples** — name 2-3 real materials with this crystal 
+   system, and briefly mention one interesting property or use of one 
+   of them.
+
+3. **Diffraction signature** — explain in detail what the diffraction 
+   pattern of this crystal system typically looks like (peak spacing, 
+   number of peaks, symmetry), and why the underlying atomic geometry 
+   produces that specific pattern.
+
+4. **Why this matters** — one or two sentences on why distinguishing 
+   this crystal system matters in real research (materials science, 
+   drug design, mineralogy, etc.)
+
+Use clear formatted sections with headers. Be scientifically accurate, 
+but write in an engaging, accessible style — like a good science 
+communicator, not a dry textbook. Aim for around 200-300 words total.
+Keep your complete response under 300 words so it fits comfortably 
+within the response limit. Make sure to finish all sections completely 
+— do not cut off mid-sentence."""
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -38,13 +55,14 @@ def explain_prediction(crystal_system: str, confidence: float ) :
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 400
+        "max_tokens": 1000
     }
     url = 'https://api.mistral.ai/v1/chat/completions'
-    responce = requests.post(url, headers = headers, json = body)
+    responce = requests.post(url, headers = headers, json = body, timeout=30)
     if responce.status_code == 200: 
         final_message = responce.json()["choices"][0]["message"]["content"] #json() conversion + extracting the content from a dictionary
         return final_message
     else:
         print ("API error:", responce.status_code, responce.text)
         return None 
+    
